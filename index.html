@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Mosquito Slasher - West Nile Edition</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body {
+            background: #111;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #gameContainer {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            max-width: 100vw;
+            max-height: 100vh;
+        }
+        canvas {
+            background: radial-gradient(circle, #3a2f28 0%, #171310 100%);
+            border: 4px solid #5c4033;
+            border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.9);
+            display: block;
+            cursor: crosshair;
+            width: 100%;
+            height: 100%;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 25px;
+            right: 25px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
+            pointer-events: none;
+        }
+        .lives { color: #ff4757; }
+        .score { color: #ffa502; }
+
+        #sprayBtn {
+            position: absolute;
+            bottom: 18px;
+            right: 18px;
+            width: 76px;
+            height: 76px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, #4dd0ff, #007bb8 75%);
+            border: 3px solid #ffffff55;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.6), 0 0 0 4px rgba(77,208,255,0.15);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            cursor: pointer;
+            z-index: 6;
+            transition: 0.15s all;
+            user-select: none;
+        }
+        #sprayBtn:hover { transform: scale(1.08); }
+        #sprayBtn:active { transform: scale(0.95); }
+        #sprayBtn .sprayLabel {
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            color: #fff;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            margin-top: -2px;
+        }
+        #sprayBtn .sprayCharge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: #2ed573;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 800;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #111;
+        }
+        #sprayBtn.used {
+            background: radial-gradient(circle at 35% 30%, #555, #2a2a2a 75%);
+            cursor: not-allowed;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+            opacity: 0.6;
+        }
+        #sprayBtn.used:hover { transform: none; }
+        #sprayBtn.used .sprayCharge { background: #777; }
+        #screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 10, 10, 0.92);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 12px;
+            z-index: 10;
+            padding: 40px;
+            text-align: center;
+        }
+        h1 { font-size: 44px; color: #ff4757; margin-bottom: 15px; letter-spacing: 2px; }
+        #screenDesc { font-size: 18px; margin-bottom: 30px; color: #aaa; max-width: 600px; line-height: 1.6; }
+        
+        /* Highlight Warning Box */
+        .warning-box {
+            background: rgba(255, 71, 87, 0.1);
+            border: 1px solid #ff4757;
+            padding: 12px 20px;
+            border-radius: 6px;
+            color: #ff6b81;
+            font-weight: bold;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+
+        /* Fact Box Styling */
+        #factBox {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 4px solid #ffa502;
+            padding: 20px;
+            border-radius: 4px;
+            margin-bottom: 30px;
+            max-width: 650px;
+            text-align: left;
+            display: none;
+        }
+        #factBox h3 { color: #ffa502; font-size: 16px; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+        #factText { color: #e0e0e0; font-size: 15px; line-height: 1.5; }
+
+        button {
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            background: #2ed573;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 20px rgba(46, 213, 115, 0.4);
+            transition: 0.2s all;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        button:hover { background: #26af5f; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div id="ui">
+        <div class="score">SCORE: <span id="scoreVal">0</span></div>
+        <div class="lives">LIVES: <span id="livesVal">❤️❤️❤️</span></div>
+    </div>
+
+    <div id="sprayBtn" onclick="useSpray()">
+        🧴
+        <span class="sprayLabel">SPRAY</span>
+        <span class="sprayCharge" id="sprayCharge">1</span>
+    </div>
+
+    <div id="screen">
+        <h1 id="screenTitle">MOSQUITO SLASHER 🦟</h1>
+        <p id="screenDesc">Slap down the blood-hungry female mosquitoes! Do not let them escape.</p>
+        
+        <div class="warning-box" id="startNotice">
+            ⚠️ NOTICE: DO NOT HURT THE MALE MOSQUITOES (🦟✨🌸)! <br>
+            Males don't bite — they're harmless pollinators. Slicing one ends the game instantly.
+        </div>
+
+        <div id="factBox">
+            <h3>Did You Know?</h3>
+            <p id="factText"></p>
+        </div>
+
+        <button id="startBtn" onclick="startGame()">Start Splatting</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreVal = document.getElementById('scoreVal');
+    const livesVal = document.getElementById('livesVal');
+    const screen = document.getElementById('screen');
+    const screenTitle = document.getElementById('screenTitle');
+    const screenDesc = document.getElementById('screenDesc');
+    const startNotice = document.getElementById('startNotice');
+    const factBox = document.getElementById('factBox');
+    const factText = document.getElementById('factText');
+    const startBtn = document.getElementById('startBtn');
+    const sprayBtn = document.getElementById('sprayBtn');
+    const sprayCharge = document.getElementById('sprayCharge');
+
+    let score = 0;
+    let lives = 3;
+    let gameOver = true;
+    let targets = [];
+    let particles = [];
+    let swipeTrail = [];
+    let spawnTimer = 0;
+    let sprayCharges = 1;
+    let sprayMilestone = 0;
+    const SPRAY_MAX = 3;
+    const SPRAY_SCORE_STEP = 300;
+    const MIN_SEPARATION = 60;
+
+    const triviaFacts = [
+        "Mosquitoes are the world's deadliest animals. Malaria alone causes over 249 million cases and 608,000+ deaths globally every single year.",
+        "Only female mosquitoes bite! Males feed exclusively on flower nectar and act as pollinators. Females require the iron and protein in blood to develop eggs.",
+        "A female mosquito can drink up to three times her own body weight in blood during a single feeding session.",
+        "Mosquitoes track human targets from up to 35 meters away using specialized receptors that detect carbon dioxide (CO2), body heat, and sweat chemicals like lactic acid.",
+        "Mosquitoes don't inject disease via stingers. They pierce skin with a proboscis and inject saliva containing an anticoagulant. The pathogen rides inside this saliva.",
+        "Mosquitoes only need a single tablespoon (or a tiny bottle cap's worth) of standing water to lay a structural 'raft' of up to 300 eggs.",
+        "Anopheles mosquitoes carry Malaria. They are nocturnal, prefer clean water, and rest uniquely with their abdomens tilted upward at a 30 to 45-degree angle.",
+        "Aedes mosquitoes carry Dengue and Zika. They are daytime biters, feature distinctive black-and-white stripes, and breed inside artificial urban containers.",
+        "Culex mosquitoes rest parallel to surfaces and carry the West Nile Virus. They thrive inside highly stagnant, polluted organic environments.",
+        "The Bird Reservoir: Humans are not the natural target for West Nile Virus. The virus naturally cycles strictly between birds and Culex mosquitoes.",
+        "Dead-End Hosts: Humans and horses are dead-end hosts for West Nile Virus. The virus cannot multiply enough in our blood to be picked up by another mosquito.",
+        "The Stealth Factor: West Nile Virus is a silent invader. Roughly 8 out of 10 people infected with the virus exhibit absolutely zero medical symptoms.",
+        "Critical Attack: Less than 1% of West Nile infections lead to severe, life-threatening neurological conditions like encephalitis or meningitis."
+    ];
+
+    function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+            x: (clientX - rect.left) * (canvas.width / rect.width),
+            y: (clientY - rect.top) * (canvas.height / rect.height)
+        };
+    }
+
+    function handleMove(e) {
+        const pos = getPos(e);
+        swipeTrail.push({ x: pos.x, y: pos.y, age: 0 });
+        if (swipeTrail.length > 15) swipeTrail.shift();
+
+        if (!gameOver) {
+            checkCollisions(pos.x, pos.y);
+        }
+    }
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('touchmove', handleMove, { passive: true });
+
+    class Spawnable {
+        constructor() {
+            this.x = Math.random() * (canvas.width - 120) + 60;
+            this.y = canvas.height + 30;
+            this.vx = Math.random() * 4 - 2;
+            this.vy = -(Math.random() * 4 + 13);
+            this.gravity = 0.24;
+            this.radius = 32;
+            this.isSliced = false;
+            this.isMale = Math.random() < 0.20; 
+        }
+
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.vy += this.gravity;
+        }
+
+        draw() {
+            ctx.save();
+            ctx.font = "40px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            if (this.isMale) {
+                // Male mosquito: golden/green glow, harmless pollinator
+                ctx.shadowBlur = 25;
+                ctx.shadowColor = "#7CFC00";
+                ctx.fillText("🦟", this.x, this.y);
+                ctx.shadowBlur = 0;
+                ctx.font = "20px sans-serif";
+                ctx.fillText("🌸", this.x + 18, this.y - 16);
+            } else {
+                // Female mosquito: dark red, blood-filled, the enemy
+                ctx.shadowBlur = 18;
+                ctx.shadowColor = "#8b0000";
+                ctx.fillStyle = "#d40000";
+                ctx.fillText("🦟", this.x, this.y);
+                ctx.shadowBlur = 0;
+                ctx.font = "16px sans-serif";
+                ctx.fillText("🔴", this.x + 16, this.y + 14);
+            }
+            ctx.restore();
+        }
+    }
+
+    class Particle {
+        constructor(x, y, color) {
+            this.x = x;
+            this.y = y;
+            this.vx = Math.random() * 8 - 4;
+            this.vy = Math.random() * 8 - 4;
+            this.radius = Math.random() * 4 + 2;
+            this.color = color;
+            this.alpha = 1;
+        }
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.alpha -= 0.03;
+        }
+        draw() {
+            ctx.save();
+            ctx.globalAlpha = this.alpha;
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    function startGame() {
+        score = 0;
+        lives = 3;
+        targets = [];
+        particles = [];
+        swipeTrail = [];
+        gameOver = false;
+        sprayCharges = 1;
+        sprayMilestone = 0;
+        scoreVal.innerText = score;
+        updateLivesUI();
+        screen.style.display = "none";
+        factBox.style.display = "none";
+        sprayBtn.classList.remove('used');
+        sprayCharge.innerText = sprayCharges;
+        sprayCharge.style.display = "flex";
+        animate();
+    }
+
+    function createNonOverlappingSpawnable() {
+        let candidate;
+        let attempts = 0;
+        do {
+            candidate = new Spawnable();
+            attempts++;
+        } while (
+            attempts < 15 &&
+            targets.some(t => !t.isSliced && Math.hypot(t.x - candidate.x, t.y - candidate.y) < MIN_SEPARATION)
+        );
+        return candidate;
+    }
+
+    function resolveOverlaps() {
+        for (let i = 0; i < targets.length; i++) {
+            const a = targets[i];
+            if (a.isSliced) continue;
+            for (let j = i + 1; j < targets.length; j++) {
+                const b = targets[j];
+                if (b.isSliced) continue;
+
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
+                let dist = Math.hypot(dx, dy);
+                if (dist < MIN_SEPARATION) {
+                    if (dist === 0) {
+                        dist = 0.01;
+                    }
+                    const overlap = (MIN_SEPARATION - dist) / 2;
+                    const nx = dx / dist;
+                    const ny = dy / dist;
+                    a.x -= nx * overlap;
+                    a.y -= ny * overlap;
+                    b.x += nx * overlap;
+                    b.y += ny * overlap;
+                }
+            }
+        }
+    }
+
+    function updateLivesUI() {
+        livesVal.innerText = "❤️".repeat(lives) + "🖤".repeat(3 - lives);
+    }
+
+    function checkCollisions(hx, hy) {
+        targets.forEach(t => {
+            if (!t.isSliced) {
+                let dist = Math.hypot(t.x - hx, t.y - hy);
+                if (dist < t.radius + 15) {
+                    t.isSliced = true;
+                    
+                    if (t.isMale) {
+                        createExplosion(t.x, t.y, "#7CFC00", 25);
+                        endGame("male");
+                    } else {
+                        score += 10;
+                        scoreVal.innerText = score;
+                        createExplosion(t.x, t.y, "#8b0000", 15);
+                        checkSprayMilestone();
+                    }
+                }
+            }
+        });
+    }
+
+    function createExplosion(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+            particles.push(new Particle(x, y, color));
+        }
+    }
+
+    function useSpray() {
+        if (gameOver || sprayCharges <= 0) return;
+        sprayCharges--;
+        updateSprayUI();
+
+        targets.forEach(t => {
+            if (!t.isSliced && !t.isMale) {
+                t.isSliced = true;
+                score += 10;
+                createExplosion(t.x, t.y, "#8b0000", 12);
+            }
+        });
+        scoreVal.innerText = score;
+        checkSprayMilestone();
+    }
+
+    function checkSprayMilestone() {
+        while (score >= sprayMilestone + SPRAY_SCORE_STEP) {
+            sprayMilestone += SPRAY_SCORE_STEP;
+            if (sprayCharges < SPRAY_MAX) {
+                sprayCharges++;
+                updateSprayUI();
+            }
+        }
+    }
+
+    function updateSprayUI() {
+        sprayCharge.innerText = sprayCharges;
+        sprayBtn.classList.toggle('used', sprayCharges <= 0);
+    }
+
+    function endGame(reason) {
+        gameOver = true;
+        screen.style.display = "flex";
+        startNotice.style.display = "none"; // Hide standard notice to focus on the fact system
+        screenTitle.innerText = "GAME OVER 💀";
+        
+        if (reason === "lives") {
+            screenDesc.innerHTML = `You let too many pests swarm away!<br>Final Score: <span style="color:#ffa502; font-size:26px; font-weight:bold;">${score}</span>`;
+        } else {
+            screenDesc.innerHTML = `Warning! You slashed a harmless male mosquito!<br>Final Score: <span style="color:#ffa502; font-size:26px; font-weight:bold;">${score}</span>`;
+        }
+
+        const randomFact = triviaFacts[Math.floor(Math.random() * triviaFacts.length)];
+        factText.innerText = randomFact;
+        factBox.style.display = "block";
+        
+        startBtn.innerText = "Try Again";
+    }
+
+    function animate() {
+        if (gameOver) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        spawnTimer++;
+        if (spawnTimer > 45) {
+            let count = Math.floor(Math.random() * 2) + 1;
+            for(let i=0; i<count; i++) targets.push(createNonOverlappingSpawnable());
+            spawnTimer = 0;
+        }
+
+        targets.forEach(t => t.update());
+        resolveOverlaps();
+
+        for (let i = targets.length - 1; i >= 0; i--) {
+            let t = targets[i];
+            t.draw();
+
+            if (t.y > canvas.height + 40 && t.vy > 0) {
+                if (!t.isSliced && !t.isMale) {
+                    lives--;
+                    updateLivesUI();
+                    if (lives <= 0) {
+                        endGame("lives");
+                    }
+                }
+                targets.splice(i, 1);
+            } else if (t.isSliced) {
+                targets.splice(i, 1);
+            }
+        }
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.update();
+            p.draw();
+            if (p.alpha <= 0) particles.splice(i, 1);
+        }
+
+        if (swipeTrail.length > 1) {
+            ctx.save();
+            ctx.strokeStyle = "rgba(0, 180, 255, 0.85)";
+            ctx.lineWidth = 7;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = "#00bfff";
+            ctx.beginPath();
+            ctx.moveTo(swipeTrail[0].x, swipeTrail[0].y);
+            for (let i = 1; i < swipeTrail.length; i++) {
+                ctx.lineTo(swipeTrail[i].x, swipeTrail[i].y);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        swipeTrail.forEach(st => st.age++);
+        swipeTrail = swipeTrail.filter(st => st.age < 8);
+
+        requestAnimationFrame(animate);
+    }
+</script>
+
+</body>
+</html>
